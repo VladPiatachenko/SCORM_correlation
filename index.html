@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>SCORM-тренажер: залежності між змінними</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #f5f7fb;
+      color: #222;
+    }
+
+    .box {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    h1, h2 {
+      color: #1f3a5f;
+    }
+
+    input, select, button {
+      padding: 8px;
+      margin: 4px;
+      border-radius: 6px;
+      border: 1px solid #aaa;
+      font-size: 14px;
+    }
+
+    button {
+      background: #1f6feb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    button:hover {
+      background: #1558bd;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-top: 12px;
+      width: 100%;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: center;
+    }
+
+    th {
+      background: #edf2f7;
+    }
+
+    td input, th input {
+      width: 90%;
+      box-sizing: border-box;
+    }
+
+    .ok {
+      background: #e8f7ee;
+      border-left: 5px solid #2e8b57;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+
+    .bad {
+      background: #fdeaea;
+      border-left: 5px solid #c0392b;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+
+    .warn {
+      background: #fff7df;
+      border-left: 5px solid #d89b00;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+
+    canvas {
+      margin-top: 18px;
+      max-height: 420px;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .heat-cell {
+      font-weight: bold;
+    }
+
+    code {
+      background: #edf2f7;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    #csvFileInput {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Практична робота 5. Виявлення залежностей між змінними</h1>
+
+  <div class="box">
+    <h2>Мета тренажера</h2>
+    <p>
+      Проаналізуйте числовий набір даних, побудуйте діаграму розсіювання,
+      обчисліть коефіцієнт кореляції, інтерпретуйте силу й напрям зв’язку
+      та визначте найсильніші й найслабші залежності між змінними.
+    </p>
+  </div>
+
+  <div class="box">
+    <h2>1. Набір даних</h2>
+
+    <p class="muted">
+      Завантажте CSV-файл із числовими даними. Перший рядок має містити назви колонок.
+      Після завантаження таблицю можна відредагувати прямо в інтерфейсі.
+    </p>
+
+    <button type="button" onclick="openFileDialog()">Завантажити CSV-файл</button>
+    <input id="csvFileInput" type="file" accept=".csv,text/csv" onchange="loadCsvFromUserFile(event)">
+
+    <button type="button" onclick="loadStudentDataFromEditableTable()">Застосувати зміни з таблиці</button>
+
+    <div id="tableContainer"></div>
+    <div id="dataStatus"></div>
+  </div>
+
+  <div class="box">
+    <h2>2. Аналіз пари змінних</h2>
+
+    <label for="xSelect">X-змінна:</label>
+    <select id="xSelect"></select>
+
+    <label for="ySelect">Y-змінна:</label>
+    <select id="ySelect"></select>
+
+    <button type="button" onclick="analyzePair()">Побудувати графік і розрахувати кореляцію</button>
+
+    <div id="correlationResult"></div>
+    <canvas id="scatterChart"></canvas>
+  </div>
+
+  <div class="box">
+    <h2>3. Інтерпретація</h2>
+
+    <label for="directionAnswer">Напрям зв’язку:</label>
+    <select id="directionAnswer">
+      <option value="">-- оберіть --</option>
+      <option value="positive">Позитивний</option>
+      <option value="negative">Негативний</option>
+      <option value="none">Відсутній або майже відсутній</option>
+    </select>
+
+    <label for="strengthAnswer">Сила зв’язку:</label>
+    <select id="strengthAnswer">
+      <option value="">-- оберіть --</option>
+      <option value="strong">Сильний</option>
+      <option value="moderate">Помірний</option>
+      <option value="weak">Слабкий або відсутній</option>
+    </select>
+
+    <label for="causationAnswer">Чи доводить кореляція причинно-наслідковий зв’язок?</label>
+    <select id="causationAnswer">
+      <option value="">-- оберіть --</option>
+      <option value="yes">Так</option>
+      <option value="no">Ні</option>
+    </select>
+  </div>
+
+  <div class="box">
+    <h2>4. Heatmap / матриця кореляцій</h2>
+
+    <p class="muted">
+      Найсильніший зв’язок визначається за найбільшим значенням |r|,
+      а найслабший — за значенням |r|, найближчим до 0.
+    </p>
+
+    <button type="button" onclick="buildHeatmap()">Побудувати матрицю кореляцій</button>
+
+    <div id="heatmap"></div>
+
+    <h3>Перевірка за матрицею</h3>
+
+    <label for="strongestPairAnswer">Яка пара має найсильніший зв’язок за модулем?</label>
+    <select id="strongestPairAnswer"></select>
+
+    <label for="weakestPairAnswer">Яка пара має найслабший зв’язок за модулем?</label>
+    <select id="weakestPairAnswer"></select>
+  </div>
+
+  <div class="box">
+    <h2>5. Завершення</h2>
+
+    <button type="button" onclick="checkResult()">Перевірити результат</button>
+
+    <div id="result"></div>
+    <div id="scormStatus" class="muted"></div>
+  </div>
+
+  <script>
+    let studentData = [];
+    let columnNames = [];
+    let currentCorrelation = null;
+    let scatterChart = null;
+    let strongestPairKey = null;
+    let weakestPairKey = null;
+    let scormInitialized = false;
+
+    function openFileDialog() {
+      document.getElementById("csvFileInput").click();
+    }
+
+    function loadCsvFromUserFile(event) {
+      const file = event.target.files[0];
+
+      if (!file) {
+        showMessage("dataStatus", "bad", "Файл не обрано.");
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        try {
+          const text = e.target.result;
+
+          parseCsvText(text);
+          renderEditableTable();
+          resetAnalysisState();
+          fillColumnSelects();
+
+          showMessage(
+            "dataStatus",
+            "ok",
+            `Файл "${file.name}" завантажено. Таблицю можна редагувати. Після редагування натисніть "Застосувати зміни з таблиці".`
+          );
+        } catch (err) {
+          showMessage("dataStatus", "bad", "Помилка читання CSV: " + err.message);
+        }
+      };
+
+      reader.onerror = function() {
+        showMessage("dataStatus", "bad", "Не вдалося прочитати файл.");
+      };
+
+      reader.readAsText(file, "UTF-8");
+
+      event.target.value = "";
+    }
+
+    function parseCsvText(text) {
+      const lines = text
+        .trim()
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+      if (lines.length < 7) {
+        throw new Error("CSV має містити рядок заголовків і мінімум 6 рядків даних.");
+      }
+
+      const headers = splitCsvLine(lines[0]).map(h => h.trim());
+
+      if (headers.length < 4) {
+        throw new Error("Потрібно мінімум 4 числові колонки.");
+      }
+
+      if (hasDuplicates(headers)) {
+        throw new Error("Назви колонок у CSV не повинні повторюватися.");
+      }
+
+      const parsedRows = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = splitCsvLine(lines[i]);
+
+        if (values.length !== headers.length) {
+          throw new Error(`Кількість значень у рядку ${i + 1} не збігається з кількістю колонок.`);
+        }
+
+        const row = {};
+
+        for (let j = 0; j < headers.length; j++) {
+          const value = parseNumber(values[j]);
+
+          if (!Number.isFinite(value)) {
+            throw new Error(`Некоректне число в рядку ${i + 1}, колонка "${headers[j]}".`);
+          }
+
+          row[headers[j]] = value;
+        }
+
+        parsedRows.push(row);
+      }
+
+      columnNames = headers;
+      studentData = parsedRows;
+    }
+
+    function splitCsvLine(line) {
+      const semicolonCount = (line.match(/;/g) || []).length;
+      const commaCount = (line.match(/,/g) || []).length;
+      const separator = semicolonCount > commaCount ? ";" : ",";
+
+      return line.split(separator).map(value => value.trim());
+    }
+
+    function parseNumber(value) {
+      return Number(String(value).trim().replace(",", "."));
+    }
+
+    function renderEditableTable() {
+      let html = "<table><thead><tr>";
+
+      columnNames.forEach((name, c) => {
+        html += `<th><input id="colName_${c}" value="${escapeHtml(name)}"></th>`;
+      });
+
+      html += "</tr></thead><tbody>";
+
+      studentData.forEach((row, r) => {
+        html += "<tr>";
+
+        columnNames.forEach((name, c) => {
+          html += `
+            <td>
+              <input
+                type="number"
+                step="any"
+                id="cell_${r}_${c}"
+                value="${row[name]}"
+              >
+            </td>
+          `;
+        });
+
+        html += "</tr>";
+      });
+
+      html += "</tbody></table>";
+
+      document.getElementById("tableContainer").innerHTML = html;
+    }
+
+    function loadStudentDataFromEditableTable() {
+      if (!columnNames.length || !studentData.length) {
+        showMessage("dataStatus", "bad", "Спочатку завантажте CSV-файл.");
+        return;
+      }
+
+      const rows = studentData.length;
+      const cols = columnNames.length;
+
+      const newColumnNames = [];
+      const newData = [];
+
+      for (let c = 0; c < cols; c++) {
+        const name = document.getElementById(`colName_${c}`).value.trim();
+
+        if (!name) {
+          showMessage("dataStatus", "bad", "Усі колонки повинні мати назви.");
+          return;
+        }
+
+        if (newColumnNames.includes(name)) {
+          showMessage("dataStatus", "bad", "Назви колонок не повинні повторюватися.");
+          return;
+        }
+
+        newColumnNames.push(name);
+      }
+
+      for (let r = 0; r < rows; r++) {
+        const row = {};
+
+        for (let c = 0; c < cols; c++) {
+          const raw = document.getElementById(`cell_${r}_${c}`).value.trim();
+
+          if (raw === "") {
+            showMessage("dataStatus", "bad", "Усі комірки мають бути заповнені числами.");
+            return;
+          }
+
+          const value = Number(raw);
+
+          if (!Number.isFinite(value)) {
+            showMessage(
+              "dataStatus",
+              "bad",
+              `Некоректне число в рядку ${r + 1}, колонка ${c + 1}.`
+            );
+            return;
+          }
+
+          row[newColumnNames[c]] = value;
+        }
+
+        newData.push(row);
+      }
+
+      columnNames = newColumnNames;
+      studentData = newData;
+
+      resetAnalysisState();
+      fillColumnSelects();
+
+      showMessage(
+        "dataStatus",
+        "ok",
+        "Зміни застосовано. Тепер можна аналізувати оновлені дані."
+      );
+    }
+
+    function resetAnalysisState() {
+      currentCorrelation = null;
+      strongestPairKey = null;
+      weakestPairKey = null;
+
+      document.getElementById("correlationResult").className = "";
+      document.getElementById("correlationResult").textContent = "";
+
+      document.getElementById("heatmap").innerHTML = "";
+
+      document.getElementById("directionAnswer").value = "";
+      document.getElementById("strengthAnswer").value = "";
+      document.getElementById("causationAnswer").value = "";
+
+      document.getElementById("result").className = "";
+      document.getElementById("result").textContent = "";
+
+      if (scatterChart) {
+        scatterChart.destroy();
+        scatterChart = null;
+      }
+    }
+
+    function fillColumnSelects() {
+      const selects = [
+        document.getElementById("xSelect"),
+        document.getElementById("ySelect")
+      ];
+
+      selects.forEach(select => {
+        select.innerHTML = "";
+
+        columnNames.forEach(name => {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          select.appendChild(option);
+        });
+      });
+
+      if (columnNames.length >= 2) {
+        document.getElementById("xSelect").value = columnNames[0];
+        document.getElementById("ySelect").value = columnNames[1];
+      }
+
+      fillPairSelects();
+    }
+
+    function fillPairSelects() {
+      const strongest = document.getElementById("strongestPairAnswer");
+      const weakest = document.getElementById("weakestPairAnswer");
+
+      strongest.innerHTML = '<option value="">-- оберіть --</option>';
+      weakest.innerHTML = '<option value="">-- оберіть --</option>';
+
+      const pairs = getAllPairs();
+
+      pairs.forEach(pair => {
+        const label = `${pair.a} — ${pair.b}`;
+
+        const o1 = document.createElement("option");
+        o1.value = pair.key;
+        o1.textContent = label;
+        strongest.appendChild(o1);
+
+        const o2 = document.createElement("option");
+        o2.value = pair.key;
+        o2.textContent = label;
+        weakest.appendChild(o2);
+      });
+    }
+
+    function analyzePair() {
+      if (!studentData.length) {
+        showMessage("correlationResult", "bad", "Спочатку завантажте CSV-файл.");
+        return;
+      }
+
+      const xName = document.getElementById("xSelect").value;
+      const yName = document.getElementById("ySelect").value;
+
+      if (xName === yName) {
+        showMessage("correlationResult", "bad", "Оберіть дві різні змінні.");
+        return;
+      }
+
+      const x = studentData.map(row => row[xName]);
+      const y = studentData.map(row => row[yName]);
+
+      if (hasZeroVariance(x) || hasZeroVariance(y)) {
+        showMessage(
+          "correlationResult",
+          "bad",
+          "Одна зі змінних має однакові значення в усіх рядках. Кореляцію неможливо обчислити."
+        );
+        return;
+      }
+
+      currentCorrelation = correlation(x, y);
+
+      showMessage(
+        "correlationResult",
+        "ok",
+        `Коефіцієнт кореляції r = ${currentCorrelation.toFixed(3)}.\n` +
+        `Для інтерпретації використовуйте |r|: 0–0.29 слабкий, 0.30–0.69 помірний, 0.70–1.00 сильний.`
+      );
+
+      drawScatter(xName, yName);
+    }
+
+    function drawScatter(xName, yName) {
+      const points = studentData.map(row => ({
+        x: row[xName],
+        y: row[yName]
+      }));
+
+      const ctx = document.getElementById("scatterChart").getContext("2d");
+
+      if (scatterChart) {
+        scatterChart.destroy();
+      }
+
+      scatterChart = new Chart(ctx, {
+        type: "scatter",
+        data: {
+          datasets: [{
+            label: `${xName} — ${yName}`,
+            data: points,
+            pointRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: xName
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: yName
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function buildHeatmap() {
+      if (!studentData.length) {
+        showMessage("heatmap", "bad", "Спочатку завантажте CSV-файл.");
+        return;
+      }
+
+      let html = "<table><thead><tr><th></th>";
+
+      columnNames.forEach(name => {
+        html += `<th>${escapeHtml(name)}</th>`;
+      });
+
+      html += "</tr></thead><tbody>";
+
+      columnNames.forEach(rowName => {
+        html += `<tr><th>${escapeHtml(rowName)}</th>`;
+
+        columnNames.forEach(colName => {
+          const x = studentData.map(row => row[rowName]);
+          const y = studentData.map(row => row[colName]);
+
+          let r = 1;
+
+          if (rowName !== colName) {
+            if (hasZeroVariance(x) || hasZeroVariance(y)) {
+              r = NaN;
+            } else {
+              r = correlation(x, y);
+            }
+          }
+
+          const display = Number.isFinite(r) ? r.toFixed(2) : "—";
+          const bg = Number.isFinite(r) ? colorForCorrelation(r) : "#eee";
+
+          html += `<td class="heat-cell" style="background:${bg}">${display}</td>`;
+        });
+
+        html += "</tr>";
+      });
+
+      html += "</tbody></table>";
+
+      document.getElementById("heatmap").innerHTML = html;
+
+      computeStrongestAndWeakestPairs();
+    }
+
+    function computeStrongestAndWeakestPairs() {
+      const pairs = getAllPairs()
+        .map(pair => {
+          const x = studentData.map(row => row[pair.a]);
+          const y = studentData.map(row => row[pair.b]);
+
+          if (hasZeroVariance(x) || hasZeroVariance(y)) {
+            return null;
+          }
+
+          const r = correlation(x, y);
+
+          return {
+            ...pair,
+            r: r,
+            abs: Math.abs(r)
+          };
+        })
+        .filter(Boolean);
+
+      if (!pairs.length) {
+        strongestPairKey = null;
+        weakestPairKey = null;
+        return;
+      }
+
+      pairs.sort((p1, p2) => p2.abs - p1.abs);
+      strongestPairKey = pairs[0].key;
+
+      pairs.sort((p1, p2) => p1.abs - p2.abs);
+      weakestPairKey = pairs[0].key;
+    }
+
+    function getAllPairs() {
+      const pairs = [];
+
+      for (let i = 0; i < columnNames.length; i++) {
+        for (let j = i + 1; j < columnNames.length; j++) {
+          pairs.push({
+            a: columnNames[i],
+            b: columnNames[j],
+            key: `${columnNames[i]}|||${columnNames[j]}`
+          });
+        }
+      }
+
+      return pairs;
+    }
+
+    function checkResult() {
+      let score = 0;
+      const messages = [];
+
+      if (!studentData.length) {
+        messages.push("Не завантажено таблицю даних.");
+      } else {
+        score += 20;
+      }
+
+      if (currentCorrelation === null) {
+        messages.push("Не виконано аналіз пари змінних.");
+      } else {
+        score += 20;
+      }
+
+      const expectedDirection = getExpectedDirection(currentCorrelation);
+      const expectedStrength = getExpectedStrength(currentCorrelation);
+
+      const directionAnswer = document.getElementById("directionAnswer").value;
+      const strengthAnswer = document.getElementById("strengthAnswer").value;
+      const causationAnswer = document.getElementById("causationAnswer").value;
+
+      if (directionAnswer === expectedDirection) {
+        score += 15;
+      } else {
+        messages.push("Неправильно визначено напрям зв’язку.");
+      }
+
+      if (strengthAnswer === expectedStrength) {
+        score += 15;
+      } else {
+        messages.push("Неправильно визначено силу зв’язку.");
+      }
+
+      if (causationAnswer === "no") {
+        score += 10;
+      } else {
+        messages.push("Кореляція сама по собі не доводить причинно-наслідковий зв’язок.");
+      }
+
+      if (!strongestPairKey || !weakestPairKey) {
+        messages.push("Не побудовано heatmap або неможливо визначити пари.");
+      } else {
+        const strongestAnswer = document.getElementById("strongestPairAnswer").value;
+        const weakestAnswer = document.getElementById("weakestPairAnswer").value;
+
+        if (strongestAnswer === strongestPairKey) {
+          score += 10;
+        } else {
+          messages.push("Неправильно визначено пару з найсильнішим зв’язком.");
+        }
+
+        if (weakestAnswer === weakestPairKey) {
+          score += 10;
+        } else {
+          messages.push("Неправильно визначено пару з найслабшим зв’язком.");
+        }
+      }
+
+      const result = document.getElementById("result");
+
+      if (score >= 80) {
+        result.className = "ok";
+        result.textContent = `✅ Тренажер завершено успішно.\nРезультат: ${score}/100.`;
+        scormSave(score, "passed");
+      } else {
+        result.className = "bad";
+        result.textContent =
+          `❌ Тренажер ще не завершено.\nРезультат: ${score}/100.\n\n` +
+          messages.join("\n");
+        scormSave(score, "incomplete");
+      }
+    }
+
+    function getExpectedDirection(r) {
+      if (r === null || !Number.isFinite(r)) return "";
+      if (r >= 0.3) return "positive";
+      if (r <= -0.3) return "negative";
+      return "none";
+    }
+
+    function getExpectedStrength(r) {
+      if (r === null || !Number.isFinite(r)) return "";
+
+      const abs = Math.abs(r);
+
+      if (abs >= 0.7) return "strong";
+      if (abs >= 0.3) return "moderate";
+      return "weak";
+    }
+
+    function mean(arr) {
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+
+    function correlation(x, y) {
+      const mx = mean(x);
+      const my = mean(y);
+
+      let numerator = 0;
+      let dx = 0;
+      let dy = 0;
+
+      for (let i = 0; i < x.length; i++) {
+        const vx = x[i] - mx;
+        const vy = y[i] - my;
+
+        numerator += vx * vy;
+        dx += vx * vx;
+        dy += vy * vy;
+      }
+
+      return numerator / Math.sqrt(dx * dy);
+    }
+
+    function hasZeroVariance(arr) {
+      return arr.every(value => value === arr[0]);
+    }
+
+    function hasDuplicates(arr) {
+      return new Set(arr).size !== arr.length;
+    }
+
+    function colorForCorrelation(r) {
+      const abs = Math.abs(r);
+      const alpha = 0.15 + abs * 0.75;
+
+      if (r >= 0) {
+        return `rgba(46, 139, 87, ${alpha})`;
+      }
+
+      return `rgba(192, 57, 43, ${alpha})`;
+    }
+
+    function showMessage(id, className, text) {
+      const el = document.getElementById(id);
+      el.className = className;
+      el.textContent = text;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function scormGetAPI(win) {
+      let depth = 0;
+
+      while (win && depth < 20) {
+        if (win.API) return win.API;
+
+        if (win.parent && win.parent !== win) {
+          win = win.parent;
+          depth++;
+        } else {
+          break;
+        }
+      }
+
+      try {
+        if (window.opener && window.opener.API) return window.opener.API;
+      } catch (e) {}
+
+      return null;
+    }
+
+    function scormBool(value) {
+      return value === true || value === "true";
+    }
+
+    function scormInit() {
+      const api = scormGetAPI(window);
+
+      if (!api) return null;
+
+      if (!scormInitialized) {
+        const res = api.LMSInitialize("");
+
+        if (!scormBool(res)) return null;
+
+        scormInitialized = true;
+      }
+
+      return api;
+    }
+
+    function scormSave(score, status) {
+      const api = scormInit();
+
+      if (!api) {
+        document.getElementById("scormStatus").textContent =
+          "SCORM API не знайдено. У LMS результат не збережено.";
+        return;
+      }
+
+      api.LMSSetValue("cmi.core.score.min", "0");
+      api.LMSSetValue("cmi.core.score.max", "100");
+      api.LMSSetValue("cmi.core.score.raw", String(score));
+      api.LMSSetValue("cmi.core.lesson_status", status);
+      api.LMSCommit("");
+
+      document.getElementById("scormStatus").textContent =
+        "Результат збережено в LMS.";
+    }
+
+    window.addEventListener("beforeunload", function () {
+      try {
+        const api = scormGetAPI(window);
+
+        if (api && scormInitialized) {
+          api.LMSFinish("");
+        }
+      } catch (e) {}
+    });
+
+    showMessage(
+      "dataStatus",
+      "warn",
+      "Завантажте CSV-файл для початку роботи. Мінімум: 4 числові колонки і 6 рядків даних."
+    );
+  </script>
+</body>
+</html>
