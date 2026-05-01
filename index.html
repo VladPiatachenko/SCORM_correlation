@@ -219,7 +219,20 @@
   </div>
 
   <div class="box">
-    <h2>6. Завершення</h2>
+    <h2>6. Порівняння сили зв’язку</h2>
+
+    <p id="comparePairsPrompt" class="muted">
+      Побудуйте матрицю кореляцій, щоб отримати завдання на порівняння сили зв’язку.
+    </p>
+
+    <label for="strongerPairAnswer">У якої пари змінних зв’язок сильніший?</label>
+    <select id="strongerPairAnswer">
+      <option value="">-- оберіть --</option>
+    </select>
+  </div>
+
+  <div class="box">
+    <h2>7. Завершення</h2>
 
     <button type="button" onclick="checkResult()">Перевірити результат</button>
 
@@ -235,6 +248,7 @@
     let strongestPairKey = null;
     let weakestPairKey = null;
     let negativePairKeys = [];
+    let strongerComparison = null;
     let scormInitialized = false;
 
     function openFileDialog() {
@@ -447,12 +461,17 @@
       strongestPairKey = null;
       weakestPairKey = null;
       negativePairKeys = [];
+      strongerComparison = null;
 
       document.getElementById("correlationResult").className = "";
       document.getElementById("correlationResult").textContent = "";
 
       document.getElementById("heatmap").innerHTML = "";
       document.getElementById("negativePairsAnswer").innerHTML = "";
+      document.getElementById("comparePairsPrompt").textContent =
+        "Побудуйте матрицю кореляцій, щоб отримати завдання на порівняння сили зв’язку.";
+      document.getElementById("strongerPairAnswer").innerHTML =
+        '<option value="">-- оберіть --</option>';
 
       document.getElementById("directionAnswer").value = "";
       document.getElementById("strengthAnswer").value = "";
@@ -690,6 +709,7 @@
         strongestPairKey = null;
         weakestPairKey = null;
         negativePairKeys = [];
+        strongerComparison = null;
         return;
       }
 
@@ -702,6 +722,60 @@
 
       pairs.sort((p1, p2) => p1.abs - p2.abs);
       weakestPairKey = pairs[0].key;
+
+      buildStrongerComparison(pairs);
+    }
+
+    function buildStrongerComparison(pairs) {
+      const prompt = document.getElementById("comparePairsPrompt");
+      const select = document.getElementById("strongerPairAnswer");
+      const sortedPairs = [...pairs].sort((p1, p2) => p2.abs - p1.abs);
+
+      strongerComparison = null;
+      select.innerHTML = '<option value="">-- оберіть --</option>';
+
+      let pairA = null;
+      let pairB = null;
+
+      for (let i = 0; i < sortedPairs.length; i++) {
+        for (let j = i + 1; j < sortedPairs.length; j++) {
+          if (Math.abs(sortedPairs[i].abs - sortedPairs[j].abs) > 0.001) {
+            pairA = sortedPairs[i];
+            pairB = sortedPairs[j];
+            break;
+          }
+        }
+
+        if (pairA && pairB) break;
+      }
+
+      if (!pairA || !pairB) {
+        prompt.textContent =
+          "Недостатньо пар із різною силою зв’язку, щоб сформувати це завдання.";
+        return;
+      }
+
+      strongerComparison = {
+        firstKey: pairA.key,
+        secondKey: pairB.key,
+        correctKey: pairA.abs > pairB.abs ? pairA.key : pairB.key
+      };
+
+      const labelA = `${pairA.a} — ${pairA.b}`;
+      const labelB = `${pairB.a} — ${pairB.b}`;
+
+      prompt.textContent =
+        `Порівняйте пари "${labelA}" і "${labelB}" та визначте, у якої з них сила зв’язку більша за модулем |r|.`;
+
+      const optionA = document.createElement("option");
+      optionA.value = pairA.key;
+      optionA.textContent = labelA;
+      select.appendChild(optionA);
+
+      const optionB = document.createElement("option");
+      optionB.value = pairB.key;
+      optionB.textContent = labelB;
+      select.appendChild(optionB);
     }
 
     function getAllPairs() {
@@ -747,13 +821,13 @@
       if (!studentData.length) {
         messages.push("Не завантажено таблицю даних.");
       } else {
-        score += 15;
+        score += 10;
       }
 
       if (currentCorrelation === null) {
         messages.push("Не виконано аналіз пари змінних.");
       } else {
-        score += 15;
+        score += 10;
       }
 
       const expectedDirection = getExpectedDirection(currentCorrelation);
@@ -787,6 +861,7 @@
         const strongestAnswer = document.getElementById("strongestPairAnswer").value;
         const weakestAnswer = document.getElementById("weakestPairAnswer").value;
         const negativeAnswers = getSelectedNegativePairs();
+        const strongerPairAnswer = document.getElementById("strongerPairAnswer").value;
 
         if (strongestAnswer === strongestPairKey) {
           score += 10;
@@ -804,6 +879,14 @@
           score += 10;
         } else {
           messages.push("Неправильно визначено пари з негативною кореляцією.");
+        }
+
+        if (!strongerComparison) {
+          messages.push("Не сформовано завдання на порівняння сили зв’язку.");
+        } else if (strongerPairAnswer === strongerComparison.correctKey) {
+          score += 10;
+        } else {
+          messages.push("Неправильно визначено, у якої пари змінних зв’язок сильніший.");
         }
       }
 
