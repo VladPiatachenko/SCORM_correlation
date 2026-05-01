@@ -5,9 +5,9 @@
 ## Структура
 
 - `index.html` — головна сторінка тренажера, UI і вся JavaScript-логіка
-- `style.css` — окремий файл стилів у репозиторії
 - `imsmanifest.xml` — SCORM-маніфест
-- `skulpt.min.js`, `skulpt-stdlib.js` — сторонні бібліотеки в складі пакета
+- `style.css` — окремий файл стилів у репозиторії, зараз не підключений у `index.html`
+- `skulpt.min.js`, `skulpt-stdlib.js` — сторонні бібліотеки в репозиторії, зараз не використовуються тренажером
 
 ## Збірка SCORM ZIP
 
@@ -15,12 +15,9 @@
 mkdir -p dist
 zip -r dist/data_correlation_scorm.zip \
   index.html \
-  imsmanifest.xml \
-  style.css \
-  skulpt.min.js \
-  skulpt-stdlib.js
+  imsmanifest.xml
 ```
 
 ## Примітка
 
-`Chart.js` підключається в `index.html` через CDN, тому для повністю офлайн-роботи в LMS бібліотеку варто додати в пакет локально.
+Поточна версія тренажера залежить від `Chart.js`, який підключається в `index.html` через CDN. Тому SCORM-пакет у його нинішньому вигляді потребує доступу до мережі для побудови графіка.
