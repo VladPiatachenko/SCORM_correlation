@@ -211,7 +211,15 @@
   </div>
 
   <div class="box">
-    <h2>5. Завершення</h2>
+    <h2>5. Пари з негативною кореляцією</h2>
+
+    <p><strong>Знайдіть пари з негативною кореляцією:</strong></p>
+    <p class="muted">Якщо таких пар немає, залиште всі прапорці порожніми.</p>
+    <div id="negativePairsAnswer" class="muted"></div>
+  </div>
+
+  <div class="box">
+    <h2>6. Завершення</h2>
 
     <button type="button" onclick="checkResult()">Перевірити результат</button>
 
@@ -226,6 +234,7 @@
     let scatterChart = null;
     let strongestPairKey = null;
     let weakestPairKey = null;
+    let negativePairKeys = [];
     let scormInitialized = false;
 
     function openFileDialog() {
@@ -437,11 +446,13 @@
       currentCorrelation = null;
       strongestPairKey = null;
       weakestPairKey = null;
+      negativePairKeys = [];
 
       document.getElementById("correlationResult").className = "";
       document.getElementById("correlationResult").textContent = "";
 
       document.getElementById("heatmap").innerHTML = "";
+      document.getElementById("negativePairsAnswer").innerHTML = "";
 
       document.getElementById("directionAnswer").value = "";
       document.getElementById("strengthAnswer").value = "";
@@ -484,24 +495,44 @@
     function fillPairSelects() {
       const strongest = document.getElementById("strongestPairAnswer");
       const weakest = document.getElementById("weakestPairAnswer");
+      const negativePairs = document.getElementById("negativePairsAnswer");
 
       strongest.innerHTML = '<option value="">-- оберіть --</option>';
       weakest.innerHTML = '<option value="">-- оберіть --</option>';
+      negativePairs.innerHTML = "";
 
-      const pairs = getAllPairs();
+      const allPairs = getAllPairs();
+      const validPairKeys = new Set(getComputedPairs().map(pair => pair.key));
 
-      pairs.forEach(pair => {
+      allPairs.forEach(pair => {
         const label = `${pair.a} — ${pair.b}`;
+        const isValid = validPairKeys.has(pair.key);
 
-        const o1 = document.createElement("option");
-        o1.value = pair.key;
-        o1.textContent = label;
-        strongest.appendChild(o1);
+        if (isValid) {
+          const o1 = document.createElement("option");
+          o1.value = pair.key;
+          o1.textContent = label;
+          strongest.appendChild(o1);
 
-        const o2 = document.createElement("option");
-        o2.value = pair.key;
-        o2.textContent = label;
-        weakest.appendChild(o2);
+          const o2 = document.createElement("option");
+          o2.value = pair.key;
+          o2.textContent = label;
+          weakest.appendChild(o2);
+
+          negativePairs.innerHTML += `
+            <label style="display:block; margin:6px 0;">
+              <input type="checkbox" id="negativePair_${pair.key}" value="${pair.key}">
+              ${escapeHtml(label)}
+            </label>
+          `;
+        } else {
+          negativePairs.innerHTML += `
+            <label style="display:block; margin:6px 0; color:#777;">
+              <input type="checkbox" disabled>
+              ${escapeHtml(label)} (кореляція не визначається)
+            </label>
+          `;
+        }
       });
     }
 
@@ -628,11 +659,11 @@
 
       document.getElementById("heatmap").innerHTML = html;
 
-      computeStrongestAndWeakestPairs();
+      computePairAnswers();
     }
 
-    function computeStrongestAndWeakestPairs() {
-      const pairs = getAllPairs()
+    function getComputedPairs() {
+      return getAllPairs()
         .map(pair => {
           const x = studentData.map(row => row[pair.a]);
           const y = studentData.map(row => row[pair.b]);
@@ -650,12 +681,21 @@
           };
         })
         .filter(Boolean);
+    }
+
+    function computePairAnswers() {
+      const pairs = getComputedPairs();
 
       if (!pairs.length) {
         strongestPairKey = null;
         weakestPairKey = null;
+        negativePairKeys = [];
         return;
       }
+
+      negativePairKeys = pairs
+        .filter(pair => getExpectedDirection(pair.r) === "negative")
+        .map(pair => pair.key);
 
       pairs.sort((p1, p2) => p2.abs - p1.abs);
       strongestPairKey = pairs[0].key;
@@ -680,6 +720,26 @@
       return pairs;
     }
 
+    function getSelectedNegativePairs() {
+      return getAllPairs()
+        .map(pair => pair.key)
+        .filter(key => {
+          const checkbox = document.getElementById(`negativePair_${key}`);
+          return checkbox && checkbox.checked;
+        });
+    }
+
+    function sameKeySets(a, b) {
+      if (a.length !== b.length) return false;
+
+      const setA = new Set(a);
+      const setB = new Set(b);
+
+      if (setA.size !== setB.size) return false;
+
+      return [...setA].every(key => setB.has(key));
+    }
+
     function checkResult() {
       let score = 0;
       const messages = [];
@@ -687,13 +747,13 @@
       if (!studentData.length) {
         messages.push("Не завантажено таблицю даних.");
       } else {
-        score += 20;
+        score += 15;
       }
 
       if (currentCorrelation === null) {
         messages.push("Не виконано аналіз пари змінних.");
       } else {
-        score += 20;
+        score += 15;
       }
 
       const expectedDirection = getExpectedDirection(currentCorrelation);
@@ -726,6 +786,7 @@
       } else {
         const strongestAnswer = document.getElementById("strongestPairAnswer").value;
         const weakestAnswer = document.getElementById("weakestPairAnswer").value;
+        const negativeAnswers = getSelectedNegativePairs();
 
         if (strongestAnswer === strongestPairKey) {
           score += 10;
@@ -737,6 +798,12 @@
           score += 10;
         } else {
           messages.push("Неправильно визначено пару з найслабшим зв’язком.");
+        }
+
+        if (sameKeySets(negativeAnswers, negativePairKeys)) {
+          score += 10;
+        } else {
+          messages.push("Неправильно визначено пари з негативною кореляцією.");
         }
       }
 
