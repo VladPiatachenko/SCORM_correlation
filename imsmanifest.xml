@@ -11,17 +11,15 @@
   </metadata>
   <organizations default="ORG-1">
     <organization identifier="ORG-1">
-      <title>Python Power Task</title>
+      <title>SCORM-тренажер: залежності між змінними</title>
       <item identifier="ITEM-1" identifierref="RES-1">
-        <title>Завдання: квадрат числа</title>
+        <title>Практична робота 5. Виявлення залежностей між змінними</title>
       </item>
     </organization>
   </organizations>
   <resources>
     <resource identifier="RES-1" type="webcontent" adlcp:scormtype="sco" href="index.html">
       <file href="index.html"/>
-      <file href="skulpt.min.js"/>
-      <file href="skulpt-stdlib.js"/>
     </resource>
   </resources>
 </manifest>
